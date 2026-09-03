@@ -207,12 +207,16 @@ function playersMarkup() {
       .map(([item, amount]) => `${escapeHtml(itemLabels[item] || item)} x${amount}`)
       .join(", ");
     const status = !player.alive ? "KAYIP" : player.hidden ? "DOLAPTA" : player.ready ? "HAZIR" : "BEKLİYOR";
+    const revive = state && state.phase === "explore" && !player.alive && player.id !== state.me
+      ? `<button class="revive-button" data-action="revive" data-value="${escapeHtml(player.id)}">CANLANDIR</button>`
+      : "";
     return `<article class="player-card ${player.alive ? "" : "dead"}">
       <div class="player-line"><strong>${escapeHtml(player.name)}</strong>${player.host ? '<span class="host-mark">HOST</span>' : ""}</div>
       <small>${status}</small>
       <div class="mini-stat"><span>CAN</span>${bar(player.health)}</div>
       <div class="mini-stat"><span>AKIL</span>${bar(player.sanity)}</div>
       <small class="inventory-line">${escapeHtml(items || "Eşyasız")}</small>
+      ${revive}
     </article>`;
   }).join("");
 }
@@ -272,7 +276,7 @@ function renderLobby() {
         <div class="player-grid">${playersMarkup()}</div>
       </section>
     </div>
-    <section class="log-panel panel"><div class="panel-kicker">KABİN KAYDI</div>${state.log.slice(-5).map((line) => `<p>${escapeHtml(line)}</p>`).join("")}</section>
+    <section class="log-panel panel"><div class="panel-kicker">KABİN KAYDI</div>${state.log.slice(-5).map((line) => `<p>${escapeHtml(line)}</p>`).join("")}<form class="chat-form" data-form="chat"><input name="value" maxlength="180" placeholder="Ekibe mesaj yaz..." autocomplete="off"><button class="secondary" type="submit">GÖNDER</button></form></section>
   </section>`;
 }
 
@@ -294,7 +298,8 @@ function renderChase() {
 function normalActions(room, me) {
   if (!me || !me.alive) return `<div class="empty-actions">Bu oyuncu artık hareket edemiyor. Ekibin devam edebilir.</div>`;
   const items = me.items || {};
-  let html = `<div class="action-row primary-actions">${actionButton("search", "ARA", "", room.lootAvailable ? "attention" : "")}${actionButton("listen", "DİNLE")}${actionButton("open", room.number === state.targetDoors ? "ASANSÖRÜ AÇ" : "KAPIYI AÇ", "", "main-action")}</div>`;
+  const openLabel = room.number === state.targetDoors ? "ASANSÖRÜ AÇ" : room.teamDoor ? "EKİPÇE AÇ" : "KAPIYI AÇ";
+  let html = `<div class="action-row primary-actions">${actionButton("search", "ARA", "", room.lootAvailable ? "attention" : "")}${actionButton("listen", "DİNLE")}${actionButton("open", openLabel, "", "main-action")}</div>`;
   html += `<div class="action-row">${actionButton(me.hidden ? "leave_hide" : "hide", me.hidden ? "DOLAPTAN ÇIK" : "SAKLAN", "", me.hidden ? "safe" : "")}${actionButton("back", "GERİ")}${actionButton("rest", "DİNLEN")}</div>`;
   html += `<div class="action-row item-actions">`;
   if (items.lighter) html += actionButton("use", "ÇAKMAK", "lighter");
@@ -320,6 +325,8 @@ function renderGame() {
   const phaseBanner = state.phase === "chase" ? renderChase() : "";
   const threat = state.threat !== "none" ? `<div class="threat-banner"><span>!</span><div><strong>${escapeHtml(state.threatText)}</strong><small>${state.threatTurns} hamle içinde herkes saklanmalı.</small></div></div>` : "";
   const puzzle = room.puzzle !== "none" && !room.puzzleSolved ? `<div class="objective-banner"><span>⚙</span><div><strong>${room.puzzle === "fuse" ? "Sigorta paneli" : "Sayı kilidi"}</strong><small>${room.puzzle === "fuse" ? "Bir sigorta kullan." : room.searched ? `İpucu: ${escapeHtml(room.clue)}` : "Odayı ara; kodu bul."}</small></div></div>` : "";
+  const aliveCount = state.players.filter((player) => player.alive).length;
+  const teamDoor = room.teamDoor && aliveCount > 1 ? `<div class="objective-banner team-objective"><span>2</span><div><strong>Ekip kapısı</strong><small>${room.openVotes}/2 oyuncu kapıyı tuttu. İkinci oyuncu da KAPIYI AÇ düğmesine bassın.</small></div></div>` : "";
   const end = won || dead ? `<div class="end-overlay ${won ? "won" : "dead"}"><div class="end-symbol">${won ? "✓" : "×"}</div><div class="panel-kicker">${won ? "VARDİYA TAMAMLANDI" : "SİNYAL KESİLDİ"}</div><h2>${won ? "Asansörden çıktınız." : "Koridor ekibi yuttu."}</h2><p>${won ? "Bu binanın kapısı bir daha aynı yerde olmayacak." : "Bir sonraki ekip daha dikkatli olmalı."}</p><button class="primary" data-action="reset">YENİ LOBİ</button></div>` : "";
   app.innerHTML = `<section class="game-layout">
     <header class="topbar">
@@ -332,7 +339,7 @@ function renderGame() {
         <div class="scene-heading"><div><div class="panel-kicker">ODA ${padDoor(room.number)}</div><h1>${escapeHtml(room.name)}</h1></div><span class="room-kind">${escapeHtml(kindLabels[room.kind] || room.kind)}</span></div>
         <pre class="room-art" aria-label="Oda görseli">${escapeHtml(roomArt(room, state.phase))}</pre>
         <div class="room-copy"><p>${escapeHtml(room.description)}</p>${room.dark && !room.lit ? '<small class="muted">Oda karanlık. Çakmak kullanmadan arama yapamazsın.</small>' : ""}${room.locked ? '<small class="warning-text">İlerideki kapı kilitli; ekip anahtar veya maymuncuk aramalı.</small>' : ""}${room.falseDoorSeen ? '<small class="warning-text">Bu kapının yankısı yok. Dikkatli olun.</small>' : ""}</div>
-        ${phaseBanner}${threat}${puzzle}
+        ${phaseBanner}${threat}${puzzle}${teamDoor}
         <div class="controls-panel">${state.phase === "chase" ? "" : normalActions(room, me)}</div>
       </section>
       <aside class="side-column">
@@ -340,7 +347,7 @@ function renderGame() {
         <section class="panel team-panel"><div class="panel-heading"><div><div class="panel-kicker">EKİP</div><h3>Asansörde</h3></div><span class="count-pill">${state.players.length}</span></div><div class="team-list">${playersMarkup()}</div></section>
       </aside>
     </main>
-    <section class="panel event-panel"><div class="panel-heading"><div><div class="panel-kicker">SON SİNYALLER</div><h3>Koridor kaydı</h3></div><span class="live-pill"><i></i> CANLI</span></div><div class="event-log">${state.log.slice(-8).map((line) => `<p>${escapeHtml(line)}</p>`).join("")}</div></section>
+    <section class="panel event-panel"><div class="panel-heading"><div><div class="panel-kicker">SON SİNYALLER</div><h3>Koridor kaydı</h3></div><span class="live-pill"><i></i> CANLI</span></div><div class="event-log">${state.log.slice(-8).map((line) => `<p>${escapeHtml(line)}</p>`).join("")}</div><form class="chat-form" data-form="chat"><input name="value" maxlength="180" placeholder="Ekibe mesaj yaz..." autocomplete="off"><button class="secondary" type="submit">GÖNDER</button></form></section>
     ${end}
   </section>`;
 }
@@ -423,6 +430,13 @@ app.addEventListener("submit", async (event) => {
     } catch (error) {
       renderJoin(error.message);
     }
+    return;
+  }
+  if (form.dataset.form === "chat") {
+    const input = form.elements.value;
+    const message = input.value.trim();
+    if (message) sendAction("chat", message);
+    input.value = "";
     return;
   }
   if (form.dataset.form === "solve") {

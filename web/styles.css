@@ -138,8 +138,12 @@ button:hover:not(:disabled) { transform: translateY(-2px); border-color: rgba(10
 .mini-stat:nth-of-type(4) .meter, .large-stat:nth-of-type(4) .meter { background: #29213b; }
 .mini-stat:nth-of-type(4) .meter i, .large-stat:nth-of-type(4) .meter i { background: #ad84df; }
 .inventory-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.revive-button { min-height: 31px; width: 100%; margin-top: 10px; padding: 0 8px; color: var(--green); border-color: rgba(114,226,161,.35); background: rgba(114,226,161,.07); font-size: .58rem; }
 .log-panel { padding: 20px 24px; margin-top: 18px; }
 .log-panel p { margin: 8px 0 0; color: var(--muted); font-size: .77rem; }
+.chat-form { display: flex; gap: 8px; margin-top: 15px; }
+.chat-form input { min-width: 0; min-height: 40px; }
+.chat-form button { min-height: 40px; padding: 0 12px; }
 
 .route-line { display: flex; align-items: center; gap: 13px; min-height: 40px; margin-bottom: 14px; color: var(--dim); font-size: .62rem; font-weight: 800; letter-spacing: .12em; }
 .route-line > div { flex: 1; overflow: hidden; white-space: nowrap; }
@@ -195,6 +199,7 @@ button:hover:not(:disabled) { transform: translateY(-2px); border-color: rgba(10
 .empty-actions { padding: 18px 0; color: var(--dim); font-size: .8rem; }
 .threat-banner, .objective-banner, .chase-panel { position: relative; z-index: 2; display: flex; align-items: center; gap: 14px; margin: 12px 0; padding: 14px; border: 1px solid rgba(255,93,108,.52); background: rgba(255,93,108,.1); }
 .objective-banner { border-color: rgba(246,201,107,.45); background: rgba(246,201,107,.07); }
+.team-objective { border-color: rgba(100,217,220,.42); background: rgba(100,217,220,.06); }
 .threat-banner > span, .objective-banner > span, .danger-icon { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto; border: 1px solid currentColor; color: var(--red); font-weight: 900; }
 .objective-banner > span { color: var(--yellow); }
 .threat-banner strong, .objective-banner strong { display: block; font-size: .78rem; }

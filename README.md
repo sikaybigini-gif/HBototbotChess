@@ -36,6 +36,8 @@ http://SUNUCU_BILGISAYARININ_IPSI:8080
 3. Diğer oyuncular kodu girerek aynı asansöre biner.
 4. Herkes `HAZIRIM` dedikten sonra host `ASANSÖRÜ BAŞLAT` düğmesine basar.
 5. En fazla 8 kişi aynı odayı, bulmacaları, tehditleri ve kovalamacaları paylaşır.
+6. Ekip kapılarında iki farklı oyuncunun aynı kapıya basması gerekir.
+7. Sohbet paneliyle ekip içi mesajlaşabilir; bandaj/adrenalin kullanarak kaybolan arkadaşını canlandırabilirsin.
 
 Sunucu `0.0.0.0` adresine bağlanır; bu yüzden telefonlar aynı yerel ağ üzerinden erişebilir. İşletim sistemi güvenlik duvarında TCP `8080` portuna izin vermen gerekebilir. İnternet üzerinden oynatmak için port yönlendirme yerine Tailscale/ZeroTier gibi güvenilir bir VPN tercih et. Bu prototipte hesap sistemi ve kimlik doğrulama yoktur; herkese açık internete doğrudan açma.
 

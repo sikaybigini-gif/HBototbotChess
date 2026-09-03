@@ -11,6 +11,7 @@
 #include <mutex>
 #include <optional>
 #include <random>
+#include <set>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -285,6 +286,8 @@ struct RoomNet {
     bool locked = false;
     bool hasCloset = true;
     bool hasShop = false;
+    bool teamDoor = false;
+    std::set<std::string> openVotes;
     bool visited = false;
     bool searched = false;
     bool puzzleSolved = false;
@@ -415,6 +418,17 @@ public:
         }
         if (command == "leave_lobby") {
             return leaveLocked(code, playerId);
+        }
+        if (command == "chat") {
+            std::string message = trim(value);
+            if (message.empty()) {
+                return stateJson(lobby, playerId);
+            }
+            if (message.size() > 180) {
+                message.resize(180);
+            }
+            addLog(lobby, "[Sohbet] " + playerFound->second.name + ": " + message);
+            return stateJson(lobby, playerId);
         }
 
         if (lobby.phase == LobbyPhase::Waiting) {
@@ -548,6 +562,8 @@ private:
                 room.locked = number > 1 && number < lobby.targetDoors && number % 6 == 0;
                 const int firstChase = std::clamp(lobby.targetDoors / 2, 5, lobby.targetDoors - 2);
                 const int secondChase = std::clamp((lobby.targetDoors * 3) / 4, firstChase + 3, lobby.targetDoors - 1);
+                room.teamDoor = number > 1 && number < lobby.targetDoors && number % 10 == 0 &&
+                                number != firstChase && number != secondChase;
                 if (!room.locked && number != firstChase && number != secondChase && number % 9 == 0) {
                     room.puzzle = PuzzleType::FuseBox;
                     room.clue = "Duvar paneli bir sigorta istiyor. Yedek sigortalar bakım odalarında olur.";
@@ -843,6 +859,10 @@ private:
     }
 
     void handleExploreAction(Lobby& lobby, PlayerNet& player, const std::string& command, const std::string& rawValue) {
+        if (command == "revive") {
+            revivePlayer(lobby, player, rawValue);
+            return;
+        }
         if (!player.alive) {
             addLog(lobby, player.name + " baygın; diğerleri devam edebilir.");
             return;
@@ -885,6 +905,43 @@ private:
 
         if (consumesTime && threatBefore != Threat::None && lobby.threat == threatBefore && lobby.phase == LobbyPhase::Explore) {
             tickThreat(lobby, threatBefore);
+        }
+    }
+
+    void revivePlayer(Lobby& lobby, PlayerNet& actor, const std::string& targetId) {
+        if (!actor.alive) {
+            addLog(lobby, "Baygın oyuncular başkasını canlandıramaz.");
+            return;
+        }
+        PlayerNet* target = nullptr;
+        if (!targetId.empty()) {
+            const auto found = lobby.players.find(targetId);
+            if (found != lobby.players.end()) {
+                target = &found->second;
+            }
+        } else {
+            for (auto& [id, player] : lobby.players) {
+                if (!player.alive) {
+                    target = &player;
+                    break;
+                }
+            }
+        }
+        if (target == nullptr || target->alive) {
+            addLog(lobby, "Canlandırılacak baygın bir ekip arkadaşı yok.");
+            return;
+        }
+        if (!takeItem(actor, "bandage") && !takeItem(actor, "adrenaline")) {
+            addLog(lobby, "Canlandırmak için bandaj veya adrenalin gerekiyor.");
+            return;
+        }
+        target->alive = true;
+        target->hidden = false;
+        target->health = 35;
+        target->sanity = 40;
+        addLog(lobby, actor.name + ", " + target->name + " adlı oyuncuyu canlandırdı.", "puzzle.wav");
+        if (lobby.phase == LobbyPhase::Dead) {
+            lobby.phase = LobbyPhase::Explore;
         }
     }
 
@@ -989,6 +1046,19 @@ private:
                 addLog(lobby, "Kilit dönmüyor. Önceki odayı arayın.");
                 return;
             }
+        }
+        int alivePlayers = 0;
+        for (const auto& [id, member] : lobby.players) {
+            alivePlayers += member.alive ? 1 : 0;
+        }
+        if (room.teamDoor && alivePlayers > 1) {
+            room.openVotes.insert(player.id);
+            if (room.openVotes.size() < 2) {
+                addLog(lobby, player.name + " kapıyı tuttu. Bir ekip arkadaşı daha `kapıyı aç` demeli.");
+                return;
+            }
+            room.openVotes.clear();
+            addLog(lobby, "İki oyuncu aynı anda bastı; ekip kapısı açılıyor.");
         }
         ++lobby.currentDoor;
         addLog(lobby, "Kapı " + doorLabel(lobby.currentDoor) + " açıldı.", "door.wav");
@@ -1162,6 +1232,7 @@ private:
             addLog(lobby, "Resepsiyonun gerisine giden yol yok.");
             return;
         }
+        lobby.rooms[static_cast<std::size_t>(lobby.currentDoor)].openVotes.clear();
         --lobby.currentDoor;
         addLog(lobby, player.name + " önceki odaya geri döndü.", "door.wav");
     }
@@ -1178,6 +1249,9 @@ private:
         }
         const std::string name = playerFound->second.name;
         const bool wasHost = playerFound->second.host;
+        for (RoomNet& room : lobby.rooms) {
+            room.openVotes.erase(playerId);
+        }
         lobby.players.erase(playerFound);
         if (lobby.players.empty()) {
             lobbies_.erase(lobbyFound);
@@ -1240,6 +1314,8 @@ private:
         output << ",\"hasShop\":" << (room.hasShop ? "true" : "false");
         output << ",\"searched\":" << (room.searched ? "true" : "false");
         output << ",\"falseDoorSeen\":" << (room.falseDoorSeen ? "true" : "false");
+        output << ",\"teamDoor\":" << (room.teamDoor ? "true" : "false");
+        output << ",\"openVotes\":" << room.openVotes.size();
         output << ",\"lootAvailable\":" << (!room.searched && !room.loot.empty() ? "true" : "false");
         output << "}";
 
