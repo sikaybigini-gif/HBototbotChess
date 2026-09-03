@@ -203,12 +203,113 @@ std::string progressBar(int value, int width = 20) {
     return bar;
 }
 
+std::string doorLabel(int number) {
+    std::ostringstream output;
+    output << std::setw(2) << std::setfill('0') << number;
+    return output.str();
+}
+
+enum class Sound {
+    Door,
+    Key,
+    Pickup,
+    Lighter,
+    Danger,
+    Hide,
+    Chase,
+    Hit,
+    Victory,
+    Death,
+};
+
+const char* soundFile(Sound sound) {
+    switch (sound) {
+    case Sound::Door:
+        return "door.wav";
+    case Sound::Key:
+        return "key.wav";
+    case Sound::Pickup:
+        return "pickup.wav";
+    case Sound::Lighter:
+        return "lighter.wav";
+    case Sound::Danger:
+        return "danger.wav";
+    case Sound::Hide:
+        return "hide.wav";
+    case Sound::Chase:
+        return "chase.wav";
+    case Sound::Hit:
+        return "hit.wav";
+    case Sound::Victory:
+        return "victory.wav";
+    case Sound::Death:
+        return "death.wav";
+    }
+    return "door.wav";
+}
+
+class AudioSystem {
+public:
+    explicit AudioSystem(bool enabled)
+        : enabled_(enabled && std::getenv("NO_SOUND") == nullptr), player_(enabled_ ? detectPlayer() : "") {}
+
+    void play(Sound sound) const {
+        if (!enabled_) {
+            return;
+        }
+
+        // The bell gives immediate feedback even on a machine without an audio
+        // player. It is only emitted in a real terminal, never in redirected logs.
+        if (terminal::isInteractive()) {
+            std::cout << '\a' << std::flush;
+        }
+        if (player_.empty()) {
+            return;
+        }
+
+        const std::string path = "assets/sfx/" + std::string(soundFile(sound));
+#ifdef _WIN32
+        const std::string command =
+            "powershell -NoProfile -Command \"(New-Object Media.SoundPlayer '" + path + "').PlaySync()\"";
+#else
+        const std::string command = player_ + " \\\"" + path + "\\\" >/dev/null 2>&1 &";
+#endif
+        // All command parts above are fixed strings; no user input is included.
+        (void)std::system(command.c_str());
+    }
+
+private:
+    bool enabled_ = true;
+    std::string player_;
+
+    static std::string detectPlayer() {
+#ifdef _WIN32
+        return "powershell";
+#else
+        if (std::system("command -v paplay >/dev/null 2>&1") == 0) {
+            return "paplay";
+        }
+        if (std::system("command -v aplay >/dev/null 2>&1") == 0) {
+            return "aplay -q";
+        }
+        if (std::system("command -v afplay >/dev/null 2>&1") == 0) {
+            return "afplay";
+        }
+        if (std::system("command -v ffplay >/dev/null 2>&1") == 0) {
+            return "ffplay -nodisp -autoexit -loglevel quiet";
+        }
+        return "";
+#endif
+    }
+};
+
 class Game {
 public:
-    Game(int targetDoors, std::uint64_t seed)
+    Game(int targetDoors, std::uint64_t seed, bool audioEnabled)
         : targetDoors_(std::clamp(targetDoors, 12, 100)),
           seed_(seed),
-          rng_(static_cast<std::mt19937::result_type>(seed)) {
+          rng_(static_cast<std::mt19937::result_type>(seed)),
+          audio_(audioEnabled) {
         chaseDoor_ = std::clamp(targetDoors_ / 2, 5, targetDoors_ - 2);
         buildRooms();
         player_.inventory[Item::Lighter] = 1;
@@ -249,6 +350,7 @@ private:
     int chaseDoor_ = 15;
     std::uint64_t seed_ = 0;
     std::mt19937 rng_;
+    AudioSystem audio_;
     std::vector<Room> rooms_;
     Player player_;
     int currentRoom_ = 1;
@@ -398,6 +500,152 @@ private:
         }
     }
 
+    void renderRoomArt(const Room& room) const {
+        const bool unlit = room.dark && !room.lit;
+        std::vector<std::string> art;
+
+        if (unlit) {
+            art = {
+                "      . . . . . . . . . . . . . . . . . . .",
+                "     /                                       \\",
+                "    |               [  ?  ]                  |",
+                "    |            .-----------.                |",
+                "    |            |     ?     |                |",
+                "    |            '-----------'                |",
+                "    |       . . . . . . . . . . . .          |",
+            };
+        } else {
+            switch (room.kind) {
+            case RoomKind::Lobby:
+                art = {
+                    "      .------------------------------------.",
+                    "     /       o                 o            \\",
+                    "    |       /|\\               /|\\           |",
+                    "    |    .--------------------------------.    |",
+                    "    |    |          RESEPSİYON           |    |",
+                    "    |    '--------------------------------'    |",
+                    "    '------------------------------------------'",
+                };
+                break;
+            case RoomKind::Corridor:
+                art = {
+                    "      .------------------------------------.",
+                    "     /       *       *       *       *        \\",
+                    "    |          .-----------------.            |",
+                    "    |          |                 |            |",
+                    "    |          |    İLERİ        |            |",
+                    "    |          |                 |            |",
+                    "    '----------'-----------------'------------'",
+                };
+                break;
+            case RoomKind::GuestRoom:
+                art = {
+                    "      .------------------------------------.",
+                    "     |      .--------.             _______    |",
+                    "     |      | pencere|            /       \\   |",
+                    "     |      '--------'           /  YATAK  \\  |",
+                    "     |                         '-----------'  |",
+                    "     |       .---------.                       |",
+                    "     '-------|  DOLAP  |----------------------'",
+                };
+                break;
+            case RoomKind::Archive:
+                art = {
+                    "      .------------------------------------.",
+                    "     |  [====] [====] [====] [====]         |",
+                    "     |  [====] [====] [====] [====]         |",
+                    "     |  [====] [====] [====] [====]         |",
+                    "     |       o                 o             |",
+                    "     |             .---------.               |",
+                    "     '-------------|  MASA   |---------------'",
+                };
+                break;
+            case RoomKind::Workshop:
+                art = {
+                    "      .------------------------------------.",
+                    "     |  ===\\        ______        /===      |",
+                    "     |      \\______/      \\______/          |",
+                    "     |        |       ⚙       |              |",
+                    "     |        '---------------'              |",
+                    "     |       _/|    ALET    |\\_             |",
+                    "     '------'------------------'-------------'",
+                };
+                break;
+            case RoomKind::Infirmary:
+                art = {
+                    "      .------------------------------------.",
+                    "     |          +       +                   |",
+                    "     |          |       |       .---.       |",
+                    "     |      .---+-------+---.   | o |       |",
+                    "     |      |    MUAYENE   |   '---'       |",
+                    "     |      '---------------'               |",
+                    "     '---------------------------------------'",
+                };
+                break;
+            case RoomKind::Elevator:
+                art = {
+                    "      .------------------------------------.",
+                    "     |              SERVİS                  |",
+                    "     |          .------------.              |",
+                    "     |          |  ASANSÖR   |              |",
+                    "     |          |      >     |              |",
+                    "     |          '------------'              |",
+                    "     '---------------------------------------'",
+                };
+                break;
+            }
+        }
+
+        std::string color = "0;36";
+        if (room.kind == RoomKind::GuestRoom || room.kind == RoomKind::Infirmary) {
+            color = "0;35";
+        } else if (room.kind == RoomKind::Workshop) {
+            color = "0;33";
+        } else if (room.kind == RoomKind::Elevator) {
+            color = "1;32";
+        }
+        if (unlit) {
+            color = "1;35";
+        }
+        if (phase_ == Phase::Chase || threat_ != Threat::None) {
+            color = "1;31";
+        }
+
+        const std::string plate = room.number == targetDoors_
+                                      ? "[ EXIT ]"
+                                      : "[ DOOR " + doorLabel(room.number) + " ]";
+        std::cout << terminal::paint("   " + plate + "\n", color);
+        for (const std::string& line : art) {
+            std::cout << terminal::paint("   " + line + "\n", color);
+        }
+    }
+
+    void renderMap() const {
+        const int firstRoom = std::max(1, currentRoom_ - 5);
+        const int lastRoom = std::min(targetDoors_, currentRoom_ + 5);
+        std::cout << terminal::paint("Rota ", "1;36");
+        for (int number = firstRoom; number <= lastRoom; ++number) {
+            const std::string label = "[" + doorLabel(number) + "]";
+            if (number == currentRoom_) {
+                std::cout << terminal::paint(label, "1;33");
+            } else if (rooms_[static_cast<std::size_t>(number)].visited) {
+                std::cout << terminal::paint(label, "0;36");
+            } else {
+                std::cout << terminal::paint("[??]", "2;37");
+            }
+            if (number != lastRoom) {
+                std::cout << terminal::paint("──", "2;37");
+            }
+        }
+        if (firstRoom > 1) {
+            std::cout << "  ...";
+        }
+        if (lastRoom < targetDoors_) {
+            std::cout << "  ...";
+        }
+        std::cout << "\n";
+    }
+
     void render() const {
         const Room& room = currentRoom();
         const std::string title = " NÖBET // UZUN KORİDOR ";
@@ -421,6 +669,8 @@ private:
         std::cout << "    Akıl " << progressBar(player_.sanity) << " " << std::setw(3) << player_.sanity << "\n";
         std::cout << "Eşyalar  " << inventorySummary() << "\n";
         std::cout << "────────────────────────────────────────────────────────────────────────\n";
+        renderMap();
+        renderRoomArt(room);
 
         if (phase_ == Phase::Chase) {
             std::cout << terminal::paint("KAÇIŞ // ARKANA BAKMA\n", "1;31");
@@ -572,6 +822,7 @@ private:
                 add(item);
             }
             room.loot.clear();
+            audio_.play(Sound::Pickup);
             std::ostringstream message;
             message << "Buldukların: ";
             bool first = true;
@@ -618,6 +869,7 @@ private:
         Room& room = currentRoom();
         if (room.number == targetDoors_) {
             phase_ = Phase::Won;
+            audio_.play(Sound::Victory);
             say("Asansör düğmesine bastın. Kapılar kapanıyor...");
             return;
         }
@@ -625,6 +877,7 @@ private:
             if (count(Item::BrassKey) > 0) {
                 take(Item::BrassKey);
                 room.locked = false;
+                audio_.play(Sound::Key);
                 say("Pirinç anahtar kilitte dönüyor. Kapı açıldı; anahtar içeride kırıldı.");
             } else if (count(Item::Lockpick) > 0) {
                 say("Bu kapıyı maymuncukla açabilirsin: `kullan maymuncuk`.");
@@ -636,6 +889,7 @@ private:
         }
 
         ++currentRoom_;
+        audio_.play(Sound::Door);
         Room& next = currentRoom();
         if (!next.visited) {
             next.visited = true;
@@ -679,6 +933,7 @@ private:
                 threat_ = Threat::Whisper;
                 say("Duvarın içinden fısıltılar yükseliyor. Seni bulmadan bir dolaba gir.");
             }
+            audio_.play(Sound::Danger);
             threatTurns_ = 2;
         } else if (room.kind == RoomKind::Archive && rollPercent(35)) {
             disturb(5, "Dosyaların arasındaki tarihler birbirini tutmuyor.");
@@ -699,6 +954,7 @@ private:
         }
 
         hidden_ = true;
+        audio_.play(Sound::Hide);
         if (threat_ != Threat::None) {
             if (rollPercent(15)) {
                 say("Dolabın kapısı tam kapanmıyor. Dışarıdaki şey seni fark etti!");
@@ -792,6 +1048,7 @@ private:
                 say("Çakmağı yakıyorsun, ama bu oda zaten aydınlık.");
             } else {
                 currentRoom().lit = true;
+                audio_.play(Sound::Lighter);
                 say("Çakmağı yaktın. Gölgelere saklanmış ayrıntılar görünür oldu.");
             }
             break;
@@ -843,9 +1100,11 @@ private:
 
     void hurt(int amount, const std::string& reason) {
         player_.health = std::max(0, player_.health - amount);
+        audio_.play(Sound::Hit);
         say(reason + ": " + std::to_string(amount) + " hasar aldın.");
         if (player_.health <= 0) {
             phase_ = Phase::Dead;
+            audio_.play(Sound::Death);
             say("Gözlerin kapanıyor.");
         }
     }
@@ -900,6 +1159,7 @@ private:
         for (int i = 0; i < 6; ++i) {
             chasePattern_.push_back(moves[static_cast<std::size_t>(rng_() % moves.size())]);
         }
+        audio_.play(Sound::Chase);
         say("Işıklar söndü! Arkanda maskesi olmayan bir gölge belirdi.");
         say("Bu bir kovalamaca: ekranda gösterilen hareketi zamanında yaz.");
     }
@@ -1121,6 +1381,7 @@ private:
 
 int main(int argc, char** argv) {
     int doors = 30;
+    bool audioEnabled = true;
     std::uint64_t seed = static_cast<std::uint64_t>(
         std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
@@ -1130,7 +1391,8 @@ int main(int argc, char** argv) {
             std::cout << "NÖBET // Uzun Koridor\n\n"
                       << "Kullanım: nightshift [--doors SAYI] [--seed SAYI]\n"
                       << "  --doors SAYI  Haritadaki kapı sayısı (12-100, varsayılan 30)\n"
-                      << "  --seed SAYI   Aynı prosedürel haritayı yeniden üret\n";
+                      << "  --seed SAYI   Aynı prosedürel haritayı yeniden üret\n"
+                      << "  --no-audio     Ses ipuçlarını kapat\n";
             return 0;
         }
         if (argument == "--doors" && index + 1 < argc) {
@@ -1148,11 +1410,15 @@ int main(int argc, char** argv) {
             }
             continue;
         }
+        if (argument == "--no-audio") {
+            audioEnabled = false;
+            continue;
+        }
         std::cerr << "Bilinmeyen seçenek: " << argument << " (yardım için --help)\n";
         return 2;
     }
 
-    Game game(doors, seed);
+    Game game(doors, seed, audioEnabled);
     game.run();
     return 0;
 }
