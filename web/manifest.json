@@ -1,0 +1,10 @@
+{
+  "name": "NÖBET // Uzun Koridor",
+  "short_name": "NÖBET",
+  "lang": "tr",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07080d",
+  "theme_color": "#07080d",
+  "description": "Arkadaşlarla oynanan özgün co-op terminal korku macerası"
+}
