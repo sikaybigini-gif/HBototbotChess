@@ -11,6 +11,7 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -50,6 +51,57 @@ std::string paint(const std::string& text, const std::string& code) {
 void clear() {
     if (isInteractive()) {
         std::cout << "\033[2J\033[H";
+    }
+}
+
+void bootAnimation() {
+    if (!isInteractive()) {
+        return;
+    }
+    const std::vector<std::string> frames = {
+        "[■□□□□□□□□□] bağlantı kuruluyor",
+        "[■■■■□□□□□□] bina haritası okunuyor",
+        "[■■■■■■■□□□] kapılar numaralandırılıyor",
+        "[■■■■■■■■■■] nöbet başlıyor",
+    };
+    for (const std::string& frame : frames) {
+        clear();
+        std::cout << paint("\n        NÖBET // UZUN KORİDOR\n\n", "1;36");
+        std::cout << paint("        " + frame + "\n", "0;37") << std::flush;
+        std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    }
+}
+
+void doorTransition() {
+    if (!isInteractive()) {
+        return;
+    }
+    const std::vector<std::string> frames = {
+        "       |              |",
+        "       |      ..      |",
+        "       |    .    .    |",
+        "       |  .        .  |",
+    };
+    for (const std::string& frame : frames) {
+        clear();
+        std::cout << paint("\n\n              KAPI AÇILIYOR\n\n", "1;33");
+        std::cout << paint(frame + "\n", "0;36") << std::flush;
+        std::this_thread::sleep_for(std::chrono::milliseconds(70));
+    }
+}
+
+void dangerFlash() {
+    if (!isInteractive()) {
+        return;
+    }
+    const std::vector<std::string> frames = {
+        "\n\n              !!  !!  !!\n              BİR ŞEY YAKLAŞIYOR\n",
+        "\n\n              !!       !!\n              SAKLAN\n",
+    };
+    for (const std::string& frame : frames) {
+        clear();
+        std::cout << paint(frame, "1;31") << std::flush;
+        std::this_thread::sleep_for(std::chrono::milliseconds(110));
     }
 }
 
@@ -390,6 +442,7 @@ public:
     }
 
     void run() {
+        terminal::bootAnimation();
         say("NÖBET başladı. Binadan çıkmak için servis asansörüne ulaş.");
         say("Bu, Roblox veya başka bir oyunun kopyası değil; C++ ile yazılmış özgün bir konsol korku macerasıdır.");
         say("Renkli ASCII sahneler, prosedürel odalar ve özgün WAV ses ipuçları aktif. Sessiz mod: `--no-audio`.");
@@ -1086,6 +1139,7 @@ private:
 
         ++currentRoom_;
         audio_.play(Sound::Door);
+        terminal::doorTransition();
         Room& next = currentRoom();
         if (!next.visited) {
             next.visited = true;
@@ -1142,6 +1196,7 @@ private:
                 say("Duvarın içinden fısıltılar yükseliyor. Seni bulmadan bir dolaba gir.");
             }
             audio_.play(Sound::Danger);
+            terminal::dangerFlash();
             threatTurns_ = 2;
         } else if (room.kind == RoomKind::Archive && rollPercent(35)) {
             disturb(5, "Dosyaların arasındaki tarihler birbirini tutmuyor.");
@@ -1455,6 +1510,7 @@ private:
             chasePattern_.push_back(moves[static_cast<std::size_t>(rng_() % moves.size())]);
         }
         audio_.play(Sound::Chase);
+        terminal::dangerFlash();
         say(chaseStage_ == 1
                 ? "Işıklar söndü! Arkanda maskesi olmayan bir gölge belirdi."
                 : "Gölge geri döndü; bu kez koridor daha dar ve çıkış daha uzakta.");

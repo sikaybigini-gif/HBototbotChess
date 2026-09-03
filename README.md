@@ -8,6 +8,8 @@ Oyun artık yalnızca metin basmaz:
 
 - ANSI renkleriyle durum paneli, rota şeridi ve oda tipine göre değişen ASCII sahneleri çizer.
 - Karanlık oda, tehlike ve kovalamaca ekranları farklı renk/çizim kullanır.
+- Etkileşimli terminalde açılış, kapı geçişi ve tehlike için kısa animasyonlar gösterilir.
+- İki ayrı kovalamaca bölümü, zorluk seviyesine göre farklı uzunlukta oynanır.
 - Her odada keşfedilebilir rota şeridi, oda plakası ve oda tipine özel küçük sahne bulunur.
 - Bazı kapılar yalnızca anahtarla değil; sigorta paneli veya üç haneli sayı kilidi çözülerek açılır.
 - Revirlerde `dinlen` komutuyla sınırlı sağlık/akıl yenilemesi yapılabilir.
