@@ -1,0 +1,13 @@
+# Local build products
+/nightshift
+/nightshift.exe
+/nightshift-server
+/nightshift-server.exe
+/build/
+
+# Local save file created by the game
+/nightshift.save
+
+# Python tooling cache
+__pycache__/
+*.py[cod]
