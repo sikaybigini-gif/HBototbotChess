@@ -134,7 +134,7 @@ Tek oyunculu terminal sürümünde:
 - `yardım`, `bak`, `ara`
 - `kapıyı aç`, `ileri`, `geri`
 - `saklan`, `çık`, `dinle`, `dinlen`
-- `kullan bandaj`, `kullan çakmak`, `kullan maymuncuk`, `kullan sigorta`
+- `kullan bandaj`, `kullan çakmak`, `kullan maymuncuk`, `kullan sigorta`, `kullan jeton`
 - `çöz 314` — sayı kilidini aç; kodu ipucunda ara
 - `satın al bandaj` — servis arabasından jetonla eşya al
 - `çanta`, `durum`, `kaydet`, `yükle`, `çıkış`

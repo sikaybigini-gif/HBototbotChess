@@ -516,6 +516,7 @@ private:
     Threat threat_ = Threat::None;
     int threatTurns_ = 0;
     int figureNoise_ = 0;
+    int figureQuietActions_ = 0;
     int chaseStage_ = 0;
     std::vector<std::string> chasePattern_;
     std::size_t chaseStep_ = 0;
@@ -1236,6 +1237,7 @@ private:
             threat_ = Threat::Figure;
             threatTurns_ = 3;
             figureNoise_ = 0;
+            figureQuietActions_ = 0;
             audio_.play(Sound::Danger);
             terminal::dangerFlash();
             say(room.number == 50
@@ -1330,6 +1332,7 @@ private:
             threatTurns_ = 0;
             if (encountered == Threat::Figure) {
                 figureNoise_ = 0;
+                figureQuietActions_ = 0;
                 currentRoom().figureCleared = true;
                 say("Salon yeniden sessiz. Şimdi kapıya ilerleyebilirsin.");
             }
@@ -1501,7 +1504,8 @@ private:
                 say("Çantanda dikkat dağıtacak jeton yok.");
             } else {
                 figureNoise_ = 0;
-                threatTurns_ = std::min(3, threatTurns_ + 1);
+                figureQuietActions_ = 1;
+                threatTurns_ = std::min(5, threatTurns_ + 2);
                 audio_.play(Sound::Danger);
                 say("Jetonu karanlığa yuvarladın. Kör nöbetçi sesi başka yöne çevirdi; şimdi saklan.");
             }
@@ -1533,8 +1537,12 @@ private:
         if (threat_ != expected || threat_ == Threat::None) {
             return;
         }
-        if (threat_ == Threat::Figure && !hidden_) {
-            ++figureNoise_;
+        if (threat_ == Threat::Figure) {
+            if (figureQuietActions_ > 0) {
+                --figureQuietActions_;
+            } else if (!hidden_) {
+                ++figureNoise_;
+            }
         }
         --threatTurns_;
         if (threatTurns_ > 0) {
@@ -1561,6 +1569,7 @@ private:
             }
             threat_ = Threat::None;
             threatTurns_ = 0;
+            figureQuietActions_ = 0;
             currentRoom().figureCleared = true;
             if (phase_ != Phase::Dead) {
                 say("Kör nöbetçi sesin izini kaybedip karanlığa çekildi.");
@@ -1569,6 +1578,7 @@ private:
         }
         threat_ = Threat::None;
         threatTurns_ = 0;
+        figureQuietActions_ = 0;
     }
 
     void hurt(int amount, const std::string& reason) {
@@ -1799,6 +1809,8 @@ private:
         chaseStage_ = std::clamp(savedChaseStage, 0, 2);
         threat_ = Threat::None;
         threatTurns_ = 0;
+        figureNoise_ = 0;
+        figureQuietActions_ = 0;
         hidden_ = false;
         phase_ = Phase::Explore;
         say("Kayıt yüklendi. Kapı " + std::to_string(currentRoom_) + " konumundasın.");

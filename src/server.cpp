@@ -366,6 +366,7 @@ struct Lobby {
     Threat threat = Threat::None;
     int threatTurns = 0;
     int figureNoise = 0;
+    int figureQuietActions = 0;
     std::vector<std::string> chasePattern;
     std::size_t chaseStep = 0;
     int chaseStage = 0;
@@ -820,6 +821,7 @@ private:
             lobby.threat = Threat::Figure;
             lobby.threatTurns = 4;
             lobby.figureNoise = 0;
+            lobby.figureQuietActions = 0;
             addLog(lobby, room.number == 50
                               ? "Kapı 50: kör nöbetçi salona girdi. Görmüyor; nefes ve metal seslerini dinliyor."
                               : "Kapı 100: son kör nöbetçi uyandı. Işığı değil, en küçük sesi takip ediyor.",
@@ -887,12 +889,16 @@ private:
         if (expected == Threat::None || lobby.threat != expected) {
             return;
         }
-        if (expected == Threat::Figure && source != nullptr && !source->hidden) {
-            ++lobby.figureNoise;
-            if (lobby.figureNoise == 1) {
-                addLog(lobby, "Kör nöbetçi en küçük sesi duydu ve başını sana çevirdi.");
-            } else if (lobby.figureNoise < 3) {
-                addLog(lobby, "Nöbetçi sesi izliyor; sessiz kalmazsan seni bulacak.");
+        if (expected == Threat::Figure && source != nullptr) {
+            if (lobby.figureQuietActions > 0) {
+                --lobby.figureQuietActions;
+            } else if (!source->hidden) {
+                ++lobby.figureNoise;
+                if (lobby.figureNoise == 1) {
+                    addLog(lobby, "Kör nöbetçi en küçük sesi duydu ve başını sana çevirdi.");
+                } else if (lobby.figureNoise < 3) {
+                    addLog(lobby, "Nöbetçi sesi izliyor; sessiz kalmazsan seni bulacak.");
+                }
             }
         }
         --lobby.threatTurns;
@@ -921,6 +927,7 @@ private:
         lobby.threat = Threat::None;
         lobby.threatTurns = 0;
         lobby.figureNoise = 0;
+        lobby.figureQuietActions = 0;
         checkTeamDead(lobby);
     }
 
@@ -1192,6 +1199,7 @@ private:
             lobby.threat = Threat::None;
             lobby.threatTurns = 0;
             lobby.figureNoise = 0;
+            lobby.figureQuietActions = 0;
             if (wasFigure) {
                 lobby.rooms[static_cast<std::size_t>(lobby.currentDoor)].figureCleared = true;
                 addLog(lobby, "Bütün ekip kıpırdamadan kaldı; kör nöbetçi sesi bulamadı.");
@@ -1266,8 +1274,9 @@ private:
                 addLog(lobby, "Çantanda dikkat dağıtacak jeton yok.");
             } else {
                 lobby.figureNoise = 0;
-                lobby.threatTurns = std::min(4, lobby.threatTurns + 1);
-                addLog(lobby, player.name + " bir jetonu karanlığa yuvarladı. Kör nöbetçi sesi başka yöne çevirdi.", "danger.wav");
+                lobby.figureQuietActions = 1;
+                lobby.threatTurns = std::min(5, lobby.threatTurns + 2);
+                addLog(lobby, player.name + " bir jetonu karanlığa yuvarladı. Kör nöbetçi sesi başka yöne çevirdi ve ekip bir an kazandı.", "danger.wav");
             }
             return;
         }
